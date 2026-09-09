@@ -1,0 +1,25 @@
+# 1. 基础环境
+seed            12345
+dimension       2
+
+# 2. 声明应用模型 (Potts 模型，100 种晶粒取向)
+app_style       potts 100
+
+# 3. 定义晶格与几何盒子 (使用 sq/2n 避免 lattice 参数解析异常)
+lattice         sq/2n 1.0
+region          box block 0 100 0 100 -0.5 0.5
+create_box      box
+create_sites    box
+
+# 4. 初始化状态与求解器
+set             site value 1 100
+solve_style     tree
+temperature     0.5
+
+# 5. 输出与诊断
+stats           10.0
+diag_style      energy
+dump            1 text 10.0 dump.potts id site
+
+# 6. 运行仿真
+run             100.0

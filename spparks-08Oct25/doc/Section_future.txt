@@ -1,0 +1,20 @@
+"Previous Section"_Section_errors.html - "SPPARKS Website"_sws -
+"SPPARKS Documentation"_sd - "SPPARKS Commands"_sc - "Next
+Section"_Manual.html :c
+
+:link(sws,https://spparks.github.io)
+:link(sd,Manual.html)
+:link(sc,Section_commands.html#comm)
+
+:line
+
+10. Future plans :h3
+
+This section lists MC applications and features we are planning to add
+to SPPARKS.  You can send an email to the developers if you are
+interested in any of these topics.
+
+Off-lattice surface growth and diffusion
+Chemical vapor deposition
+Additive manufacture related features and apps.
+Pore migration (Veena Tikare, Sandia) :ul

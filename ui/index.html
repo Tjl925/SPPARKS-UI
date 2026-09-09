@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f4f6f3" />
+  <title>SPPARKS · 材料仿真实验台</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head>
+<body>
+  <svg class="sprite" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 10 9-5M12 12 3 7m9 5v10M7.5 4.5l9 5v5"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8Z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 2 8M3 3v7h7"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 3v17h17M7 8l4 4 4-2 5 6"/></symbol>
+  </defs></svg>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="打开案例库"><span class="brand-mark"><svg><use href="#i-cube"/></svg></span><span>SPPARKS<small>MATERIAL SIMULATION LAB</small></span></a>
+    <div class="top-divider"></div><span class="app-name">材料仿真实验台</span>
+    <div class="top-right"><span class="engine-status" id="engineStatus"><i></i>检测计算引擎</span><span class="local-label">LOCAL WORKSPACE</span><button class="avatar" id="helpButton" title="关于实验台" aria-label="关于实验台">?</button></div>
+  </header>
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="sidebar-label">工作空间 <span>01</span></div>
+      <button class="nav-item" id="caseNav"><svg><use href="#i-grid"/></svg>案例库<span class="nav-count">1</span></button>
+      <button class="nav-item active" id="labNav"><svg><use href="#i-cube"/></svg>仿真实验台<span class="active-dot"></span></button>
+      <button class="nav-item" id="compareNav"><svg><use href="#i-compare"/></svg>结果对比</button>
+      <div class="sidebar-rule"></div>
+      <div class="sidebar-label">当前案例</div>
+      <button class="current-case" id="currentCase"><span class="case-icon"><svg><use href="#i-cube"/></svg></span><span>Potts 晶粒长大<small>三维 · 蒙特卡洛</small></span></button>
+      <div class="case-tree"><span class="tree-node">简单立方晶格</span><span class="tree-node">周期性边界</span><span class="tree-node" id="sidebarSource">历史结果回放</span></div>
+      <div class="sidebar-bottom"><div class="integration-icon">＋</div><strong>为新的材料模型预留空间</strong><p>统一描述模型、参数与输出场，<br>延续同一套观察体验。</p><button class="text-button" id="integrationButton">查看接入说明 <svg><use href="#i-arrow"/></svg></button></div>
+      <div class="sidebar-footer"><span class="tiny-dot"></span>SPPARKS OPEN SOURCE <span>↗</span></div>
+    </aside>
+    <main>
+      <div class="breadcrumb">案例库 <span>/</span> 晶粒长大 <span>/</span> <b>三维实验台</b></div>
+      <section class="page-heading"><div><div class="eyebrow">MICROSTRUCTURE EVOLUTION <span>CASE 001</span></div><h1>看见微观组织的演化<span class="title-dot">.</span></h1><p>Potts 晶粒长大 <span>·</span> 从随机初态到有序组织，探索三维空间中的变化。</p></div><div class="heading-actions"><button class="button" id="importButton"><svg><use href="#i-upload"/></svg>导入结果</button><button class="button dark-button" id="presentButton"><svg><use href="#i-expand"/></svg>展示模式</button></div></section>
+      <div class="experiment-layout">
+        <div class="visual-column">
+          <section class="viewer-card">
+            <div class="viewer-toolbar"><div class="view-tabs"><button class="selected" id="singleTab"><svg><use href="#i-cube"/></svg>三维组织</button><button id="compareTab"><svg><use href="#i-compare"/></svg>初始 / 当前</button></div><div class="viewer-tools"><button class="icon-button" id="resetView" title="复位视角" aria-label="复位视角"><svg><use href="#i-reset"/></svg></button><button class="icon-button" id="snapshotButton" title="导出当前视图 PNG" aria-label="导出当前视图 PNG"><svg><use href="#i-download"/></svg></button></div></div>
+            <div class="stage" id="stage"><div id="viewport" class="viewport" aria-label="三维格点视图，可拖拽旋转、滚轮缩放、右键平移" tabindex="0"></div><div id="compareViewport" class="viewport compare-viewport" aria-label="当前帧对比视图" tabindex="0"></div><div class="stage-heading"><span class="live-dot"></span><span id="stageSource">历史结果 · 真实数据</span><span class="stage-divider">/</span><span id="stageSize">20 × 20 × 20</span></div><div class="stage-label" id="compareLabel">初始态</div><div class="stage-label compare-label" id="compareLabelRight">当前态</div><div class="stage-time">t = <strong id="stageTime">100.00</strong><small>模型时间</small></div><div class="stage-bottom"><span><span class="mouse-icon"></span>拖拽旋转 <i>·</i> 滚轮缩放 <i>·</i> 右键平移</span><span id="visibleCount">8,000 格点</span></div><div class="loading" id="loading">正在载入真实仿真结果…</div><div class="selection" id="selection" hidden></div></div>
+            <div class="timeline"><div class="playback-row"><button id="playButton" class="play-button" aria-label="播放演化"><svg><use href="#i-play"/></svg></button><button id="prevFrame" class="step-button" title="上一帧" aria-label="上一帧">‹</button><button id="nextFrame" class="step-button" title="下一帧" aria-label="下一帧">›</button><div class="time-readout"><b id="currentTime">100.00</b><span>/ <span id="endTime">100.00</span></span></div><span class="frame-tag" id="frameCounter">11 / 11 帧</span><select id="playSpeed" aria-label="回放速度"><option value="1500">0.5×</option><option value="750" selected>1×</option><option value="375">2×</option></select></div><input type="range" min="0" max="10" value="10" id="timeline" aria-label="仿真时间轴"/><div class="timeline-labels"><span>初始组织 <b>0</b></span><span id="middleTime">50</span><span><b id="endLabel">100</b> 演化末态</span></div></div>
+          </section>
+          <section class="analysis-card"><div class="analysis-heading"><div><svg><use href="#i-chart"/></svg><h2>能量演化</h2><span>与时间轴联动</span></div><span class="legend-dot"></span><span class="chart-key">格点总能量</span></div><div class="analysis-body"><div class="chart-wrap"><svg id="energyChart" viewBox="0 0 600 138" role="img" aria-label="总能量随模型时间变化曲线"></svg><span class="chart-axis-label">模型时间 →</span></div><div class="energy-summary"><span>当前总能量 <small>模型单位</small></span><strong id="energyValue">—</strong><span class="energy-change" id="energyChange">—</span></div></div></section>
+          <p class="data-footnote"><svg><use href="#i-info"/></svg><span id="dataFootnote">数据来源：SPPARKS 随包历史示例。状态颜色表示类别，不等同于独立晶粒或真实晶体取向。</span><button id="sourceButton">来源与模型说明</button></p>
+        </div>
+        <aside class="inspector">
+          <section class="control-section"><div class="section-title"><span class="section-index">01</span><h2>观察设置</h2><span class="small-tag">VIEW</span></div><label class="toggle-row" for="clipEnabled"><span>剖切观察<small>移除外层，查看内部组织</small></span><input type="checkbox" id="clipEnabled" role="switch"/><span class="switch-track"></span></label><div id="clipControls" class="clip-controls disabled"><div class="label-row"><span>剖切方向</span><span id="clipLayerLabel">Z = 9</span></div><div class="segmented" aria-label="剖切方向"><button data-axis="0">X</button><button data-axis="1">Y</button><button data-axis="2" class="selected">Z</button></div><input type="range" id="clipPosition" min="0" max="19" value="9" aria-label="保留至剖切层"/><div class="range-labels"><span id="clipMin">0</span><span id="clipMax">19</span></div></div><label class="toggle-row compact" for="autoRotate"><span>自动旋转</span><input type="checkbox" id="autoRotate" role="switch"/><span class="switch-track"></span></label><div class="color-legend"><div class="label-row"><span>状态分类配色</span><span id="stateCount">Q = 100</span></div><div class="palette" id="palette"></div><p>同色表示同一状态编号</p></div></section>
+          <section class="control-section parameter-section"><div class="section-title"><span class="section-index">02</span><h2>仿真参数</h2><button class="tiny-button" id="resetParams" title="恢复当前结果的参数">重置</button></div><p class="section-hint">修改后运行，生成一组新的真实结果。</p><form id="parameterForm"><div id="parameterFields"></div><div class="fixed-params"><span>晶格 <b>SC / 26 邻居</b></span><span>边界 <b>三向周期性</b></span></div><button class="button primary-button" type="submit" id="runButton" disabled><svg><use href="#i-play"/></svg><span>运行仿真</span><svg class="run-arrow"><use href="#i-arrow"/></svg></button></form><div class="job-status" id="jobStatus" role="status">正在检测本地引擎…</div></section>
+          <div class="observation-note"><span class="note-mark">↳</span><div><strong id="observationTitle">观察提示</strong><p id="observationText">开启剖切，拖动时间轴，观察内部同状态区域的变化。</p></div></div>
+        </aside>
+      </div>
+      <footer class="main-footer"><span><span class="tiny-dot"></span>从微观结构，理解材料行为</span><span>SPPARKS / MATERIAL LAB <b>01</b></span></footer>
+    </main>
+  </div>
+  <dialog id="infoDialog"><div class="dialog-heading"><div><span class="eyebrow" id="dialogEyebrow">MATERIAL LAB</span><h2 id="dialogTitle"></h2></div><button class="icon-button" id="closeDialog" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div><div id="dialogBody"></div></dialog>
+  <input id="fileInput" type="file" accept=".json,application/json" hidden/>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

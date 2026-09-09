@@ -1,0 +1,18 @@
+make[1]: Entering directory '/mnt/d/spparks-08Oct25/src'
+make[2]: Entering directory '/mnt/d/spparks-08Oct25/src/STUBS'
+rm *.o libmpi.a
+make[2]: Leaving directory '/mnt/d/spparks-08Oct25/src/STUBS'
+make[2]: Entering directory '/mnt/d/spparks-08Oct25/src/STUBS'
+g++ -O -c mpi.cpp
+ar rs libmpi.a mpi.o
+ar: creating libmpi.a
+make[2]: Leaving directory '/mnt/d/spparks-08Oct25/src/STUBS'
+make[1]: Leaving directory '/mnt/d/spparks-08Oct25/src'
+Compiling SPPARKS for machine serial
+make[1]: warning: -j8 forced in submake: resetting jobserver mode.
+make[1]: Entering directory '/mnt/d/spparks-08Oct25/src/Obj_serial'
+make[1]: Leaving directory '/mnt/d/spparks-08Oct25/src/Obj_serial'
+make[1]: warning: -j8 forced in submake: resetting jobserver mode.
+make[1]: Entering directory '/mnt/d/spparks-08Oct25/src/Obj_serial'
+make[1]: '../spk_serial' is up to date.
+make[1]: Leaving directory '/mnt/d/spparks-08Oct25/src/Obj_serial'

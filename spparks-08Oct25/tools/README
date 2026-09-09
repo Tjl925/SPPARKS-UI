@@ -1,0 +1,18 @@
+= SPPARKS related scripts and tools
+:toc:
+:date: Oct 7 2025
+
+== Directories
+
+=== crystalline_orientations
+See the ./crystalline_orientations/README.adoc
+
+
+=== stitch
+This directory contains scripts useful for processing stitch files.  
+
+
+== Files
+* dump2input.py for converting SPPARKS output to input
+* copyright: copyright statement placed in every spparks source file
+* update_copyright.sh: script used to change copyright

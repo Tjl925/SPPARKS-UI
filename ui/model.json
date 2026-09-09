@@ -1,0 +1,18 @@
+{
+  "id": "potts",
+  "schemaVersion": 1,
+  "title": "Potts · 晶粒长大",
+  "description": "通过格点状态的随机更新，观察三维组织及界面能量的演化。",
+  "geometry": { "type": "fixed-lattice", "lattice": "sc/26n", "boundary": "periodic" },
+  "fields": [{ "id": "state", "label": "状态编号", "kind": "categorical", "source": "states" }],
+  "metrics": [{ "id": "energy", "label": "总能量", "unit": "模型单位", "source": "SPPARKS diag_style energy" }],
+  "capabilities": ["orbit", "clip", "pick", "timeline", "compare"],
+  "runner": "potts-local",
+  "parameters": [
+    { "id": "size", "label": "立方域边长", "type": "integer", "min": 8, "max": 32, "default": 20 },
+    { "id": "states", "label": "初始状态种类上限 Q", "type": "integer", "min": 2, "max": 100, "default": 100 },
+    { "id": "temperature", "label": "模型温度 T", "type": "number", "min": 0, "max": 2, "step": 0.1, "default": 0 },
+    { "id": "duration", "label": "仿真终止时间", "type": "integer", "min": 10, "max": 100, "default": 100 },
+    { "id": "seed", "label": "随机种子", "type": "integer", "min": 1, "max": 2147483646, "default": 56789 }
+  ]
+}

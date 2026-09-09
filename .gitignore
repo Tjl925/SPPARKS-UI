@@ -1,0 +1,40 @@
+# Local agent/editor configuration
+.claude/
+.codex/
+.agents/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Dependencies and caches
+node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Generated UI outputs (historical upstream example logs stay included)
+/ui/runs/
+/ui/test-results/
+/ui/*.log
+
+# SPPARKS build products
+Obj_*/
+*.o
+*.a
+*.so
+*.so.*
+*.dll
+*.exe
+/spparks-08Oct25/src/spk_*
+
+# Temporary repository administration files
+/.publish-tmp/
