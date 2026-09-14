@@ -8,6 +8,11 @@ const valid = () => ({ schemaVersion:1, modelId:'potts', ids:[1,2], positions:[[
 test('accepts fixed lattice results and missing energy',()=>{const data=valid();data.frames[1].energy=null;assert.equal(validateResult(data),data);});
 test('rejects malformed imports before replacing current data',()=>{
   const mutations=[d=>d.ids[1]=1,d=>d.positions[0][0]=NaN,d=>d.positions[0][0]=10,d=>d.frames[1].time=0,
-    d=>d.frames[0].states.pop(),d=>d.frames[0].energy=-2,d=>d.spacing=0,d=>d.modelId='unknown',d=>d.parameters={seed:'abc'},d=>d.ids=null];
+    d=>d.frames[0].states.pop(),d=>d.frames[0].energy=Infinity,d=>d.spacing=0,d=>d.modelId='unknown',d=>d.parameters={seed:'abc'},d=>d.ids=null];
   for(const mutate of mutations){const data=valid();mutate(data);assert.throws(()=>validateResult(data));}
+});
+test('model-specific states and signed energy are validated',()=>{
+  const d=valid();d.modelId='ising';d.frames[0].energy=-3;assert.equal(validateResult(d),d);
+  d.frames[0].states[0]=3;assert.throws(()=>validateResult(d));
+  d.modelId='thin_film';assert.equal(validateResult(d),d);d.positions[0][2]=1;assert.throws(()=>validateResult(d));
 });

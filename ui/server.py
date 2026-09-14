@@ -11,6 +11,7 @@ import time
 import uuid
 
 from data_adapter import read_dump, read_energy, validate_parameters, input_script
+from models import MODELS, get_model
 
 ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT.parent / 'spparks-08Oct25'
@@ -39,8 +40,10 @@ def probe_engine():
 def run_job(job):
     folder = RUNS / job['id']
     try:
+        model_id = job.get('modelId', 'potts')
+        model = get_model(model_id)
         folder.mkdir(parents=True)
-        (folder / 'input.in').write_text(input_script(job['parameters']))
+        (folder / 'input.in').write_text(input_script(job['parameters'], model_id), encoding='utf-8')
         command = ['wsl', '-d', DISTRO, '--cd', linux_path(folder), '--exec', '/usr/bin/timeout', '180', linux_path(BINARY), '-in', 'input.in'] if os.name == 'nt' else [str(BINARY), '-in', 'input.in']
         with (folder / 'console.log').open('w', encoding='utf-8') as log:
             process = subprocess.Popen(command, cwd=folder, stdout=log, stderr=subprocess.STDOUT,
@@ -54,10 +57,10 @@ def run_job(job):
         if code:
             tail = (folder / 'console.log').read_text(errors='replace')[-2500:]
             raise ValueError('SPPARKS 运行失败：' + tail)
-        result = read_dump(folder / 'result.dump', folder / 'log.spparks')
-        result.update(title='Potts · 本次计算', source='computed', parameters=job['parameters'],
+        result = read_dump(folder / 'result.dump', folder / 'log.spparks', model_id)
+        result.update(title=model['title'], source='computed', parameters=job['parameters'],
                       provenance={'description': '本地 SPPARKS 真实计算', 'jobId': job['id'],
-                                  'input': input_script(job['parameters']), 'energy': 'SPPARKS diag_style energy，格点能量总和'})
+                                  'input': input_script(job['parameters'], model_id), 'energy': 'SPPARKS diag_style energy，格点能量总和'})
         (folder / 'result.json').write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
         with LOCK:
             job.update(status='complete', elapsed=round(time.time() - job['started'], 1))
@@ -87,6 +90,19 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == '/api/engine':
             return self.respond(ENGINE)
+        if path == '/api/models':
+            return self.respond(list(MODELS.values()))
+        if path.startswith('/api/demo/'):
+            model_id = path.removeprefix('/api/demo/')
+            if model_id not in MODELS:
+                return self.respond({'error': '不支持的模型'}, 404)
+            if model_id == 'potts':
+                path = '/api/demo'
+            else:
+                file = ROOT / 'demo' / model_id / 'result.json'
+                if not file.exists():
+                    return self.respond({'error': '案例数据尚未生成'}, 503)
+                return self.respond(json.loads(file.read_text(encoding='utf-8')))
         if path == '/api/demo':
             data = read_dump(SOURCE / 'examples/potts/dump.potts', SOURCE / 'examples/potts/log.potts.11Nov09.linux.1')
             data.update(title='Potts · 晶粒长大', source='historical', parameters=validate_parameters({}),
@@ -126,7 +142,14 @@ class Handler(SimpleHTTPRequestHandler):
             length = int(self.headers.get('Content-Length', '0'))
             if not 0 < length <= 4096:
                 raise ValueError('请求大小无效')
-            parameters = validate_parameters(json.loads(self.rfile.read(length)))
+            raw = json.loads(self.rfile.read(length))
+            model_id = 'potts'
+            if isinstance(raw, dict) and 'modelId' in raw:
+                if set(raw) != {'modelId', 'parameters'}:
+                    raise ValueError('模型请求字段无效')
+                model_id = raw['modelId']
+                raw = raw['parameters']
+            parameters = validate_parameters(raw, model_id)
         except (ValueError, TypeError) as exc:
             return self.respond({'error': str(exc)}, 400)
         if not ENGINE['available']:
@@ -134,7 +157,7 @@ class Handler(SimpleHTTPRequestHandler):
         with LOCK:
             if any(j['status'] == 'running' for j in JOBS.values()):
                 return self.respond({'error': '已有任务正在计算，请等待完成'}, 409)
-            job = {'id': uuid.uuid4().hex[:12], 'status': 'running', 'parameters': parameters, 'started': time.time()}
+            job = {'id': uuid.uuid4().hex[:12], 'modelId': model_id, 'status': 'running', 'parameters': parameters, 'started': time.time()}
             JOBS[job['id']] = job
         threading.Thread(target=run_job, args=(job,), daemon=True).start()
         self.respond(dict(job), 202)

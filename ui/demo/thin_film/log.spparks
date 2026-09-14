@@ -1,0 +1,76 @@
+SPPARKS (08 Oct 2025)
+# Reduced 2D thin-film example; original nonlinear hop barriers
+seed 56789
+app_style diffusion nonlinear hop
+dimension 2
+lattice tri 2.42
+region box block 0 32 0 24 -0.5 0.5
+create_box box
+Created box = (0 0 -1.21) to (77.44 100.598 1.21)
+  1 by 1 by 1 processor grid
+create_sites box
+Creating sites ...
+  1536 sites
+  1536 sites have 6 neighbors
+set site value 1
+  1536 settings made for site
+region bottom block INF INF INF 1.0 INF INF
+set site value 2 region bottom
+  96 settings made for site
+region top block INF INF 22.9 INF INF INF
+set site value 3 region top
+  64 settings made for site
+solve_style tree
+deposition event 2e-09 0 -1 0 1.0 1 5
+temperature 0.0216
+diag_style energy stats yes
+diag_style diffusion
+stats 2e+10
+dump 1 text 2e+10 result.dump id site x y z
+barrier		hop * 0 2000.
+barrier		hop * 1 1000.
+barrier		hop 1 1 0.45
+barrier		hop 1 2 0.05
+barrier		hop 1 3 0.025
+barrier		hop 1 4 0.01
+barrier		hop 1 5 0.005
+barrier		hop 2 2 0.45
+barrier		hop 2 3 0.38
+barrier		hop 2 4 0.31
+barrier		hop 2 5 0.005
+barrier		hop 3 2 0.910
+barrier		hop 3 3 0.850
+barrier		hop 3 4 0.710
+barrier		hop 3 5 0.200
+barrier		hop 4 2 1.340
+barrier		hop 4 3 1.210
+barrier		hop 4 4 0.960
+barrier		hop 4 5 0.480
+barrier		hop 5 2 1.400
+barrier		hop 5 3 1.020
+barrier		hop 5 4 0.930
+barrier		hop 5 5 0.760
+run 2e+11
+Setting up run ...
+Running with 32-bit site IDs
+Memory usage per processor = 1.875 Mbytes
+      Time    Naccept    Nreject    Nsweeps        CPU     Energy    Deposit  FailedDep    1stHops    2ndHops
+         0          0          0          0          0          0          0          0          0          0
+2.07248e+10         88          0          0     0.0015          0         41          4         43          0
+4.01578e+10        229          0          0    0.00872          0         89         10        130          0
+6.02325e+10        329          0          0     0.0169          0        129         13        187          0
+8.02159e+10        429          0          0     0.0242          0        167         18        244          0
+1.00591e+11        531          0          0     0.0322          0        196         20        315          0
+1.20148e+11        661          0          0     0.0396          0        231         24        406          0
+1.40142e+11        799          0          0     0.0472          0        274         29        496          0
+1.60093e+11        952          0          0     0.0555          0        321         33        598          0
+1.80017e+11       1062          0          0      0.064          0        351         34        677          0
+     2e+11       1197          0          0     0.0708          0        391         40        766          0
+Loop time of 0.076982 on 1 procs
+
+Solve time (%) = 0.000285864 (0.371338)
+Update time (%) = 0 (0)
+Comm  time (%) = 0 (0)
+Outpt time (%) = 0.0597119 (77.5661)
+App   time (%) = 0.0169442 (22.0106)
+Other time (%) = 4.00543e-05 (0.0520307)

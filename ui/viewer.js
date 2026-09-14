@@ -79,8 +79,11 @@ export class LatticeViewer {
     this.camera.updateProjectionMatrix();
   }
 
-  load(data) {
+  load(data, model = {}) {
     this.data = data;
+    this.model = model;
+    this.planar = data.modelId === 'thin_film';
+    this.frameIndex = data.frames.length-1;
     this.selectedIndex = null;
     this.selected.visible = false;
     if (this.group) {
@@ -94,7 +97,8 @@ export class LatticeViewer {
     this.center = mins.map((v,a)=>(v+maxs[a])/2);
     const spans = mins.map((v,a)=>maxs[a]-v+data.spacing);
     this.extent = Math.max(...spans);
-    this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(data.spacing*.998, data.spacing*.998, data.spacing*.998), new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }), data.ids.length);
+    const geometry = this.planar ? new THREE.SphereGeometry(data.spacing*.43,12,8) : new THREE.BoxGeometry(data.spacing, data.spacing, data.spacing);
+    this.mesh = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }), data.ids.length);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.group.add(this.mesh);
@@ -106,6 +110,7 @@ export class LatticeViewer {
     grid.material.transparent = true;
     grid.material.opacity = 0.3;
     this.group.add(grid);
+    grid.visible = !this.planar;
     const axes = new THREE.AxesHelper(this.extent*0.22);
     axes.position.set(-spans[0]/2-.4, -spans[1]/2-.4, -spans[2]/2-.05);
     this.group.add(axes);
@@ -120,6 +125,13 @@ export class LatticeViewer {
 
   reset() {
     if (!this.extent) return;
+    this.camera.up.set(0, this.planar?1:0, this.planar?0:1);
+    if(this.planar){
+      this.controls.target.set(0,0,0);
+      this.camera.position.set(0,0,this.extent*1.8/Math.min(1,this.camera.aspect));
+      this.controls.update();
+      return;
+    }
     this.controls.target.set(0,0,-this.extent*.04);
     const scale = this.extent * (this.camera.aspect < 1 ? 2.6 : 1.65);
     this.camera.position.set(scale*1.08, -scale*1.42, scale*1.04);
@@ -130,8 +142,9 @@ export class LatticeViewer {
     if (!this.data) return;
     this.frameIndex = index;
     const states = this.data.frames[index].states;
-    for (let i=0;i<states.length;i++) this.mesh.setColorAt(i, this.color.set(stateColor(states[i])));
+    for (let i=0;i<states.length;i++) this.mesh.setColorAt(i, this.color.set(this.model.colors?.[states[i]] || stateColor(states[i])));
     this.mesh.instanceColor.needsUpdate = true;
+    if(this.planar)this.setClip(this.clip);
     this.updateSelection();
   }
 
@@ -142,7 +155,8 @@ export class LatticeViewer {
     this.visibleSites = new Uint8Array(this.data.ids.length);
     for (let i=0;i<this.data.positions.length;i++) {
       const p=this.data.positions[i];
-      const show = !clip.enabled || p[clip.axis] <= clip.value + 1e-6;
+      const show = (!clip.enabled || p[clip.axis] <= clip.value + 1e-6) &&
+        (!this.planar || this.showVacancies || this.data.frames[this.frameIndex].states[i] === 2);
       this.visibleSites[i] = show ? 1 : 0;
       if (show) { this.matrix.makeTranslation(p[0]-this.center[0],p[1]-this.center[1],p[2]-this.center[2]); count++; }
       else this.matrix.makeScale(0,0,0);

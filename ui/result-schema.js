@@ -1,6 +1,6 @@
 export function validateResult(data) {
   const fail = message => { throw new Error('结果文件无效：'+message); };
-  if (!data || data.schemaVersion !== 1 || data.modelId !== 'potts') fail('首版支持 schemaVersion=1、modelId=potts。');
+  if (!data || data.schemaVersion !== 1 || !['potts','ising','thin_film'].includes(data.modelId)) fail('支持 schemaVersion=1 及 Potts、Ising、薄膜生长模型。');
   const n = data.ids?.length;
   if (!Number.isInteger(n) || n<1 || n>40000) fail('格点数须为 1–40,000。');
   if (!Array.isArray(data.ids) || data.ids.some(x=>!Number.isSafeInteger(x)||x<1) || new Set(data.ids).size!==n) fail('格点 ID 必须唯一且为正整数。');
@@ -15,8 +15,11 @@ export function validateResult(data) {
     if (!f || !Number.isFinite(f.time) || f.time<0 || f.time<=previous) fail('模型时间必须有限且严格递增。');
     previous=f.time;
     if (!Array.isArray(f.states)||f.states.length!==n||f.states.some(v=>!Number.isSafeInteger(v)||v<1||v>1000000)) fail('每帧必须为每个格点提供一个正整数状态。');
-    if (f.energy!==null && (!Number.isFinite(f.energy)||f.energy<0)) fail('能量必须为非负有限数值或 null。');
+    if (data.modelId==='ising' && f.states.some(v=>v!==1&&v!==2)) fail('Ising 状态只能为 1 或 2。');
+    if (data.modelId==='thin_film' && f.states.some(v=>v<1||v>3)) fail('薄膜状态只能为 1、2、3。');
+    if (f.energy!==null && !Number.isFinite(f.energy)) fail('能量必须为有限数值或 null。');
   }
+  if(data.modelId==='thin_film' && data.positions.some(p=>p[2]!==0)) fail('薄膜示例必须为 z=0 的二维截面。');
   if (data.parameters!=null && (typeof data.parameters!=='object'||Array.isArray(data.parameters)||Object.values(data.parameters).some(v=>!Number.isFinite(v)))) fail('参数必须为数值对象。');
   return data;
 }

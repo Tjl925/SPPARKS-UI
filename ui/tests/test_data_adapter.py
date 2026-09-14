@@ -3,11 +3,42 @@ from pathlib import Path
 import tempfile
 import unittest
 from data_adapter import read_dump, read_energy, validate_parameters, input_script
+from models import MODELS
+import json
 
 SOURCE = Path(__file__).resolve().parents[2] / 'spparks-08Oct25'
 
 
 class DataTests(unittest.TestCase):
+    def test_new_bundled_cases_are_real_and_reproducible(self):
+        for model_id in ('ising', 'thin_film'):
+            folder = Path(__file__).resolve().parents[1] / 'demo' / model_id
+            saved = json.loads((folder / 'result.json').read_text(encoding='utf-8'))
+            parsed = read_dump(folder / 'result.dump', folder / 'log.spparks', model_id)
+            self.assertEqual(saved['frames'], parsed['frames'])
+            self.assertEqual(saved['modelId'], model_id)
+            self.assertEqual(len(saved['frames']), 11)
+            self.assertEqual((folder/'input.in').read_text(), input_script(saved['parameters'], model_id))
+            self.assertTrue(all(f['energy'] is not None for f in parsed['frames']))
+            if model_id == 'ising':
+                self.assertEqual(len(saved['ids']), 8000)
+                self.assertTrue(set(saved['frames'][0]['states']) <= {1,2})
+            else:
+                self.assertTrue(all(p[2] == 0 for p in saved['positions']))
+                self.assertGreater(saved['frames'][-1]['states'].count(2), saved['frames'][0]['states'].count(2))
+
+    def test_model_specific_parameters(self):
+        self.assertNotIn('states', validate_parameters({}, 'ising'))
+        self.assertIn('app_style ising', input_script(validate_parameters({}, 'ising'), 'ising'))
+        film = input_script(validate_parameters({}, 'thin_film'), 'thin_film')
+        self.assertIn('dimension 2', film)
+        self.assertIn('barrier', film)
+        self.assertIn('deposition event', film)
+        for model_id, raw in [('ising', {'states':10}), ('thin_film', {'flux':0}), ('unknown', {}),
+                              ('thin_film', {'size':16,'flux':5e-9,'duration':3e11})]:
+            with self.assertRaises(ValueError):
+                validate_parameters(raw, model_id)
+
     def test_historical_dump_and_energy_alignment(self):
         data = read_dump(SOURCE / 'examples/potts/dump.potts', SOURCE / 'examples/potts/log.potts.11Nov09.linux.1')
         self.assertEqual(len(data['ids']), 8000)
