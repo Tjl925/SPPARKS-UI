@@ -1,8 +1,12 @@
 # SPPARKS UI · 材料仿真实验台
 
-面向材料与物理领域专家的交互式仿真展示工具，以 **Potts 三维晶粒长大**为首个案例。
+Agent / 新会话入口：[AGENTS.md](AGENTS.md) → [当前状态](docs/PROJECT_STATE.md) → [现行计划](docs/PLAN.md)。关键背景见 [决策](docs/DECISIONS.md) 与 [架构](docs/ARCHITECTURE.md)；验证与验收见 [验证记录](ui/VERIFICATION.md)。
+
+产品目标：**在保持专业性的前提下，降低使用门槛，让非 SPPARKS 专家也能快速理解输入项并启动仿真。** 面向材料与物理领域的交互式仿真工作台，以 **Potts 三维晶粒长大**为首个案例。
 
 第一版已于 **2026-09-09 通过用户验收**。2026-09-14 新增 Ising 与薄膜生长案例。优先保证展示、交互和真实数据可追溯，后续接入学院新开发的材料模型。
+
+2026-09-17：按“物理定义 → 计算平台 → 运行控制台 → 可视化分析”重组工作台。左上配置模型、激励与格点状态，右上展示真实宿主机资源与串行运行条件，下方运行真实任务并读取日志。参数提供含义、范围和单位说明。
 
 ## 案例库
 
@@ -46,14 +50,18 @@ Windows 默认通过 `Ubuntu-24.04` WSL 调用 `spparks-08Oct25/src/spk_serial`�
 
 ```text
 ui/                      三维前端、本地服务、数据适配器和测试
-docs/PROJECT_PLAN.md      完整路线图与今日完成勾选
+AGENTS.md                Agent 工作规则与新会话恢复流程
+docs/PLAN.md             现行滚动路线图
+docs/PROJECT_STATE.md    当前实现、验证、阻塞与下一步
+docs/DECISIONS.md        关键决策与重新考虑条件
+docs/ARCHITECTURE.md     当前实际架构与接口
 docs/superpowers/specs/   已确认的设计记录
 spparks-08Oct25/          现有 SPPARKS 源码、文档及案例资料
 ```
 
 ## 文档与验证
 
-- [完整计划表与完成清单](docs/PROJECT_PLAN.md)
+- [现行路线图](docs/PLAN.md)
 - [使用、运行与模型接入说明](ui/README.md)
 - [验证记录](ui/VERIFICATION.md)
 - [设计记录](docs/superpowers/specs/2026-09-09-potts-ui-design.md)

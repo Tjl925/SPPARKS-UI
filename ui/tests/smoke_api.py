@@ -15,6 +15,9 @@ def call(path, data=None):
 
 
 if __name__=='__main__':
+    platform=call('/api/platform')
+    assert platform['status'] in ('ready','partial'), platform
+    assert platform['execution']['threads']==1
     assert {m['id'] for m in call('/api/models')} == {'potts','ising','thin_film'}
     for bad in [{'modelId':'unknown','parameters':{}}, {'modelId':'ising','parameters':{'states':4}}]:
         try:
@@ -32,6 +35,7 @@ if __name__=='__main__':
             time.sleep(1)
             job=call('/api/jobs/'+job['id'])
         assert job['status']=='complete',job
+        assert 'SPPARKS' in job['console'] and len(job['console']) < 13000
         result=call('/api/jobs/'+job['id']+'/result')
         assert result['modelId']==model_id
         assert len(result['frames'])==11

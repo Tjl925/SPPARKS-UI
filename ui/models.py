@@ -55,6 +55,31 @@ ISING['metrics'].append({'id':'magnetization','label':'平均自旋','unit':'无
 FILM['metrics'].append({'id':'occupied','label':'占据格点数','unit':'格点','source':'count(state=2)'})
 MODELS = {m['id']: m for m in (POTTS, ISING, FILM)}
 
+# Help describes the actual allowlisted templates, not an atomistic material model.
+POTTS['physics'] = dict(material='多状态晶粒组织 / Potts', excitation='热涨落与界面能驱动',
+    entities='粗粒化格点；状态编号用于组织分类，不代表元素或独立晶粒。',
+    initial='随机分配 1–Q 状态', dynamics='随机扫描 · 蒙特卡洛',
+    fixed='晶格间距 1.0（模型长度）；26 邻居；三向周期边界。')
+ISING['physics'] = dict(material='双状态自旋体系 / Ising', excitation='热涨落；无外加磁场',
+    entities='每个格点代表一个自旋自由度，取 −1 或 +1；不指定原子种类。',
+    initial='随机分配两种自旋状态', dynamics='随机扫描 · 自旋翻转',
+    fixed='晶格间距 1.0（模型长度）；6 邻居；三向周期边界。')
+FILM['physics'] = dict(material='粒子沉积体系 / Diffusion', excitation='沿 −Y 沉积与热激活扩散',
+    entities='格点表示空位、占据或顶部禁沉积状态；当前未指定化学元素。',
+    initial='底部占据层，其余为空位/顶部禁沉积层', dynamics='树求解器 · 动力学蒙特卡洛',
+    fixed='三角晶格间距 2.42（模型长度）；纵向 24 单元；沿用示例跃迁势垒。')
+for model in MODELS.values():
+    for p in model['parameters']:
+        details = {
+            'size': ('structure', '格点单元', '每个方向的晶格单元数；增大尺寸会增加格点和计算量。' if model['dimension']==3 else '横向晶格单元数；纵向固定为 24 单元。'),
+            'states': ('structure', '类', '初始状态编号的上限 Q，不是独立晶粒个数。'),
+            'temperature': ('excitation', '模型量', '控制热激活变化的强度；未标定为开尔文，不能直接当作实验温度。'),
+            'flux': ('excitation', '模型量', '控制沉积事件频率；与终止时间共同影响沉积量，不是实验通量。'),
+            'duration': ('run', '模型时间', '求解器运行的目标模型时间；不等于等待的秒数。默认输出约 11 帧。'),
+            'seed': ('run', '整数', '确定随机初态与随机事件序列；同模型同参数同引擎可复现实验。'),
+        }
+        p['group'], p['unit'], p['help'] = details[p['id']]
+
 
 def get_model(model_id):
     if not isinstance(model_id, str) or model_id not in MODELS:

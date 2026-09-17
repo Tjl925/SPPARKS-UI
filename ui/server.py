@@ -12,6 +12,7 @@ import uuid
 
 from data_adapter import read_dump, read_energy, validate_parameters, input_script
 from models import MODELS, get_model
+from platform_info import detect_platform, read_console_tail
 
 ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT.parent / 'spparks-08Oct25'
@@ -19,6 +20,7 @@ RUNS = ROOT / 'runs'
 JOBS = {}
 LOCK = threading.Lock()
 ENGINE = {'available': False, 'message': '正在检测本地计算引擎…'}
+PLATFORM = {'status': 'detecting'}
 DISTRO = os.environ.get('SPPARKS_WSL_DISTRO', 'Ubuntu-24.04')
 BINARY = Path(os.environ.get('SPPARKS_BINARY', str(SOURCE / 'src' / 'spk_serial')))
 
@@ -37,6 +39,11 @@ def probe_engine():
         ENGINE.update(available=False, message='引擎不可用；请检查 WSL 和 SPPARKS 路径')
 
 
+def probe_platform():
+    PLATFORM.update(detect_platform())
+    PLATFORM['runtime'] = DISTRO if os.name == 'nt' else '本地 Linux'
+
+
 def run_job(job):
     folder = RUNS / job['id']
     try:
@@ -44,9 +51,10 @@ def run_job(job):
         model = get_model(model_id)
         folder.mkdir(parents=True)
         (folder / 'input.in').write_text(input_script(job['parameters'], model_id), encoding='utf-8')
-        command = ['wsl', '-d', DISTRO, '--cd', linux_path(folder), '--exec', '/usr/bin/timeout', '180', linux_path(BINARY), '-in', 'input.in'] if os.name == 'nt' else [str(BINARY), '-in', 'input.in']
+        command = ['wsl', '-d', DISTRO, '--cd', linux_path(folder), '--exec', '/usr/bin/timeout', '180', '/usr/bin/env', 'OMP_NUM_THREADS=1', linux_path(BINARY), '-in', 'input.in'] if os.name == 'nt' else [str(BINARY), '-in', 'input.in']
         with (folder / 'console.log').open('w', encoding='utf-8') as log:
             process = subprocess.Popen(command, cwd=folder, stdout=log, stderr=subprocess.STDOUT,
+                                       env={**os.environ, 'OMP_NUM_THREADS': '1'},
                                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             try:
                 code = process.wait(timeout=195)
@@ -90,6 +98,8 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == '/api/engine':
             return self.respond(ENGINE)
+        if path == '/api/platform':
+            return self.respond(PLATFORM)
         if path == '/api/models':
             return self.respond(list(MODELS.values()))
         if path.startswith('/api/demo/'):
@@ -122,9 +132,10 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.respond(json.loads((RUNS / job['id'] / 'result.json').read_text(encoding='utf-8')))
             rows = read_energy(RUNS / job['id'] / 'log.spparks')
             snapshot['simulationTime'] = rows[-1][0] if rows else 0
+            snapshot['console'] = read_console_tail(RUNS / job['id'] / 'console.log')
             snapshot['elapsed'] = snapshot.get('elapsed', round(time.time() - job['started'], 1))
             return self.respond(snapshot)
-        allowed = {'/', '/index.html', '/styles.css', '/app.js', '/viewer.js', '/result-schema.js', '/model.json'}
+        allowed = {'/', '/index.html', '/styles.css', '/workbench.css', '/app.js', '/guidance.js', '/viewer.js', '/result-schema.js', '/model.json'}
         if path not in allowed:
             vendor_root = (ROOT / 'node_modules/three').resolve()
             requested = (ROOT / unquote(path).lstrip('/')).resolve()
@@ -168,5 +179,6 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=8765)
     args = parser.parse_args()
     threading.Thread(target=probe_engine, daemon=True).start()
+    threading.Thread(target=probe_platform, daemon=True).start()
     print(f'SPPARKS Material Lab: http://127.0.0.1:{args.port}', flush=True)
     ThreadingHTTPServer(('127.0.0.1', args.port), Handler).serve_forever()

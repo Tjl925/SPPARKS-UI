@@ -1,15 +1,20 @@
 import { LatticeViewer, PALETTE } from './viewer.js';
 import { validateResult } from './result-schema.js';
+import { mountGuidance, validateDraft, explainError } from './guidance.js';
 
 const $ = id => document.getElementById(id);
 const icon = name => `<svg><use href="#i-${name}"/></svg>`;
-const format = value => Math.abs(value)>=1e6?Number(value).toExponential(2):Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+const format = value => Math.abs(value)>=1e6||(value!==0&&Math.abs(value)<0.001)?Number(value).toExponential(2):Number(value).toLocaleString('en-US', { maximumFractionDigits: 4 });
 const timeLabel = value => Math.abs(value)>=1e5?Number(value).toExponential(2):Number(value).toFixed(2);
 const escape = value => String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state = { data: null, frame: 0, playing: false, compare: false, clip: { enabled:false, axis:2, value:9 }, engine:false, running:false, model:null };
 let viewer, compareViewer, playbackTimer, toastTimer;
 let selected = null;
 let caseRequest = 0;
+const guidance=mountGuidance({getState:()=>state});
+function reportError(error,context,actionLabel,action,scroll=true){guidance.show({...explainError(error,context),detail:error.message,actionLabel,action,scroll});}
+function setStoredJob(id){try{if(id)sessionStorage.setItem('spparks-job',id);else sessionStorage.removeItem('spparks-job');}catch{}}
+function getStoredJob(){try{return sessionStorage.getItem('spparks-job');}catch{return null;}}
 const metric = frame => state.model.id==='thin_film'?frame.states.filter(s=>s===2).length:frame.energy;
 function updateVisibleCount(){
   if(!state.data)return;
@@ -19,10 +24,17 @@ function updateVisibleCount(){
 function updateModelUI(model){
   state.model=model;
   buildParameters();
-  document.querySelector('h1').textContent=model.heading+'.';
-  document.querySelector('.page-heading p').textContent=model.title+' · '+model.question;
+  document.querySelector('h1').textContent=model.title+'实验';
+  document.querySelector('.page-heading p').textContent=model.question+' 从物理定义到可追溯的计算结果。';
   document.querySelector('.breadcrumb').textContent='案例库 / '+model.title+' / 实验台';
-  document.querySelector('.eyebrow').textContent=`MATERIAL SIMULATION / CASE ${model.number}`;
+  document.querySelector('.eyebrow').textContent=`SIMULATION WORKBENCH / CASE ${model.number}`;
+  $('modelSelect').value=model.id;
+  $('modelDimension').textContent=model.dimension+'D';
+  $('modelDescription').textContent=model.description;
+  $('excitationDescription').textContent=model.physics.excitation;
+  $('entityDescription').textContent=model.physics.entities;
+  $('fixedDescription').textContent=model.physics.fixed;
+  $('initialDescription').textContent='初态：'+model.physics.initial+'；演化方法：'+model.physics.dynamics+'。';
   $('currentCase').innerHTML=`<span class="case-icon">${icon('cube')}</span><span>${escape(model.title)}<small>${escape(model.subtitle)}</small></span>`;
   document.querySelector('.case-tree').innerHTML=`<span class="tree-node">${escape(model.latticeLabel)}</span><span class="tree-node">${escape(model.boundaryLabel)}</span><span class="tree-node" id="sidebarSource"></span>`;
   document.querySelector('.fixed-params').innerHTML=`<span>晶格 <b>${escape(model.latticeLabel)}</b></span><span>边界 <b>${escape(model.boundaryLabel)}</b></span>`;
@@ -48,26 +60,50 @@ async function loadCase(id){
   const request=++caseRequest;
   pause();
   if(state.running){toast('请等待当前计算完成后再切换案例');return;}
+  state.loadingCase=true;$('runButton').disabled=true;guidance.clear();
   $('loading').hidden=false;$('loading').textContent='正在载入案例真实数据…';
   try{const data=await api(`/api/demo/${id}`);if(request!==caseRequest)return;applyData(data);setCompare(false);$('infoDialog').close();toast('已载入 '+state.model.title);}
-  catch(e){if(request===caseRequest){$('loading').hidden=true;toast(e.message);}}
+  catch(e){if(request===caseRequest){$('loading').hidden=true;$('modelSelect').value=state.model.id;$('infoDialog').close();reportError(e,'load','重新载入案例',()=>loadCase(id));}}
+  finally{if(request===caseRequest){state.loadingCase=false;$('runButton').disabled=!state.engine||state.running;}}
 }
 
 function toast(message) { $('toast').textContent=message; $('toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('toast').hidden=true,4500); }
-async function api(url,options) { const response=await fetch(url,options); const data=await response.json(); if(!response.ok) throw new Error(data.error||'请求失败'); return data; }
+async function api(url,options) {
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+  try{const response=await fetch(url,{...options,signal:controller.signal});const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'请求失败'),{status:response.status});return data;}
+  catch(error){if(error.name==='AbortError')error.message='连接等待超过 20 秒，请检查本地服务。';throw error;}
+  finally{clearTimeout(timer);}
+}
 function download(content,name,type='application/json') { const url=URL.createObjectURL(new Blob([content],{type})); const a=document.createElement('a'); a.href=url; a.download=name; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),30000); }
 function modal(title,body,eyebrow='MATERIAL LAB') { $('dialogTitle').textContent=title; $('dialogEyebrow').textContent=eyebrow; $('dialogBody').innerHTML=body; if(!$('infoDialog').open) $('infoDialog').showModal(); }
 $('closeDialog').onclick=()=>$('infoDialog').close();
 $('infoDialog').addEventListener('click',e=>{if(e.target===$('infoDialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
 
 function buildParameters() {
-  $('parameterFields').innerHTML=state.model.parameters.map(p=>`<div class="field"><label for="param-${p.id}">${escape(p.label)}</label><input id="param-${p.id}" name="${p.id}" type="number" min="${p.min}" max="${p.max}" step="${p.step||1}" value="${p.default}" required /></div>`).join('');
+  const field=p=>`<div class="field"><div class="field-top"><label for="param-${p.id}">${escape(p.label)}</label><span class="field-unit">${escape(p.unit)}</span></div><input form="parameterForm" aria-describedby="help-${p.id}" id="param-${p.id}" name="${p.id}" type="number" min="${p.min}" max="${p.max}" step="${p.step||1}" value="${p.default}" required /><small class="field-help" id="help-${p.id}">${escape(p.help)}<br><span class="field-range">范围 ${format(p.min)}–${p.id==='seed'?p.max.toLocaleString('en-US'):format(p.max)}</span></small></div>`;
+  for(const [group,target] of [['structure','parameterFields'],['excitation','excitationFields'],['run','runFields']]){
+    $(target).innerHTML=state.model.parameters.filter(p=>p.group===group).map(field).join('');
+  }
+  document.querySelectorAll('input[form="parameterForm"]').forEach(input=>input.addEventListener('input',updateInputSummary));
+}
+function updateInputSummary(){
+  if(!state.model)return;
+  const p=Object.fromEntries(state.model.parameters.map(p=>[p.id,Number($('param-'+p.id).value)]));
+  const valid=state.model.parameters.every(rule=>{const input=$('param-'+rule.id);return input.validity.valid;});
+  const known=state.model.parameters.every(rule=>Number.isFinite(state.data?.parameters?.[rule.id]));
+  const dirty=known&&state.model.parameters.some(rule=>p[rule.id]!==state.data.parameters[rule.id]);
+  $('inputNotice').classList.toggle('dirty',dirty||!valid||!known);
+  $('inputNotice').textContent=!valid?'请检查参数范围和步长，再启动仿真。':!known?'当前结果未提供完整参数，缺失项使用默认值；运行前请确认。':dirty?'待运行参数已修改。右侧仍显示原结果，启动并完成计算后才会更新。':'参数与当前结果一致。可直接启动，或修改参数创建新结果。';
+  const sites=state.model.dimension===3?p.size**3:p.size*24*2;
+  $('runSummary').textContent=valid?`${state.model.dimension}D · ${format(sites)} 格点 · 目标 t = ${format(p.duration)}`:'参数尚未有效 · 请检查上方输入';
+  document.querySelectorAll('input[form="parameterForm"]').forEach(input=>{input.removeAttribute('aria-invalid');input.removeAttribute('aria-errormessage');});
 }
 function resetParameters() {
   for(const p of state.model.parameters) {
     const value=state.data?.parameters?.[p.id];
     $(`param-${p.id}`).value=Number.isFinite(value)&&value>=p.min&&value<=p.max ? value : p.default;
   }
+  updateInputSummary();
 }
 
 function applyData(data) {
@@ -100,6 +136,9 @@ function applyData(data) {
   updateClip();
   setFrame(data.frames.length-1);
   $('loading').hidden=true;
+  $('resultStatus').textContent='已载入结果 / 回放';
+  guidance.refresh();
+  if(!state.running){$('jobPhase').textContent=state.engine?'待运行':'就绪检查';$('consoleOutput').textContent='尚未提交任务。\n选择模型 → 确认参数 → 启动仿真。\n此处显示 SPPARKS 实际运行日志。';$('jobElapsed').textContent='—';$('jobIdentity').textContent='NO ACTIVE JOB';$('solverTime').textContent='—';$('solverProgress').value=0;$('jobIndicator').className='';}
   if(!state.running){$('jobStatus').classList.remove('error');$('jobStatus').textContent=state.engine?'本地计算 · 完成后自动载入结果':'正在检测本地引擎…';}
 }
 
@@ -245,31 +284,84 @@ function showCases(){
 $('caseNav').onclick=showCases;$('currentCase').onclick=showCases;document.querySelector('.brand').onclick=e=>{e.preventDefault();showCases();};
 $('integrationButton').onclick=()=>{modal('为新模型留好接口',`<p>把计算逻辑、模型描述和可视化结果分开。后续的铁电材料模型可以沿用实验台的交互框架。</p><h3>01 / 模型描述</h3><p><code>models.py</code> 注册案例，描述文件声明参数、范围、输出量和显示能力。当前界面的参数表单已由该描述生成。</p><h3>02 / 结构与结果</h3><p>固定格点坐标与 ID 加上每帧的状态、时间和能量。当前可导入 Potts、Ising、薄膜生长的固定晶格结果 JSON；文件不执行代码。</p><h3>03 / 计算适配器</h3><p>新物理模型需要在 SPPARKS 中实现并编译，或接入独立求解器。自定义晶格还需提供位置、邻居关系和初始数值。导入结构并不自动实现新的能量函数。</p><h3>后续扩展</h3><p>可为极化矢量增加箭头与分量着色。首版渲染器仅支持固定晶格上的标量分类状态。</p><div class="dialog-actions"><button class="button" id="downloadModel">下载模型描述</button><button class="button" id="exportExample">导出当前结果作格式示例</button></div>`,'MODEL INTEGRATION');$('downloadModel').onclick=()=>download(JSON.stringify(state.model,null,2),`${state.model.id}-model.json`);$('exportExample').onclick=()=>{if(state.data)download(JSON.stringify(state.data),`${state.model.id}-result-example.json`);};};
 $('importButton').onclick=()=>$('fileInput').click();
-$('fileInput').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(state.running){toast('请等待当前计算完成后再导入');e.target.value='';return;}caseRequest++;try{if(file.size>50*1024*1024)throw new Error('结果文件不得超过 50 MB');const data=validateResult(JSON.parse(await file.text()));data.source='imported';applyData(data);toast(`已导入 ${data.frames.length} 帧结果`);}catch(error){toast(error instanceof SyntaxError?'无法解析 JSON，请检查文件格式':error.message);}finally{e.target.value='';}};
+$('fileInput').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(state.running){toast('请等待当前计算完成后再导入');e.target.value='';return;}caseRequest++;state.loadingCase=false;guidance.clear();try{if(file.size>50*1024*1024)throw new Error('结果文件不得超过 50 MB');const data=validateResult(JSON.parse(await file.text()));data.source='imported';applyData(data);toast(`已导入 ${data.frames.length} 帧结果`);}catch(error){reportError(error,'import','重新选择文件',()=>$('fileInput').click());}finally{e.target.value='';$('runButton').disabled=!state.engine||state.running;}};
 $('resetParams').onclick=()=>{resetParameters();toast('已恢复当前结果的参数；缺失参数使用默认值');};
 
-async function engineStatus(){try{const data=await api('/api/engine');state.engine=data.available;$('engineStatus').innerHTML='<i></i>'+escape(data.message);$('engineStatus').classList.toggle('offline',!data.available);$('runButton').disabled=!data.available||state.running;if(!state.running)$('jobStatus').textContent=data.available?'本地计算 · 完成后自动载入结果':data.message;if(data.message.includes('正在检测'))setTimeout(engineStatus,2000);}catch{state.engine=false;$('runButton').disabled=true;$('engineStatus').innerHTML='<i></i>本地服务连接中断';$('engineStatus').classList.add('offline');if(!state.running)$('jobStatus').textContent='请重新启动本地服务，5 秒后重试连接。';setTimeout(engineStatus,5000);}}
+$('modelSelect').onchange=()=>loadCase($('modelSelect').value);
+function lockInputs(locked){
+  document.querySelectorAll('input[form="parameterForm"]').forEach(input=>input.disabled=locked);
+  $('modelSelect').disabled=locked;$('resetParams').disabled=locked;$('importButton').disabled=locked;
+}
+async function loadPlatform(){
+  try{
+    const p=await api('/api/platform');
+    if(p.status==='detecting'){setTimeout(loadPlatform,2000);return;}
+    const memory=n=>n==null?'未获取':(n/1024**3).toFixed(1)+' GiB';
+    $('hostSystem').textContent=(p.system||'本地')+' / 宿主机';
+    $('cpuName').textContent=p.cpuName||'CPU 型号未获取';
+    $('physicalCores').textContent=p.physicalCores??'未获取';
+    $('logicalProcessors').textContent=p.logicalProcessors??'未获取';
+    $('memoryTotal').textContent=memory(p.memoryTotal);
+    $('memoryAvailable').textContent='采样可用 '+memory(p.memoryAvailable);
+    $('runtimeName').textContent=p.runtime||'未获取';
+    $('platformState').textContent=p.status==='partial'?'部分信息未获取':'已检测';
+    $('platformSampled').textContent='采样于 '+new Date(p.sampledAt*1000).toLocaleString('zh-CN')+' · 服务启动时检测';
+  }catch{$('platformState').textContent='检测失败';$('cpuName').textContent='未能读取硬件信息';$('runtimeName').textContent='未获取';$('platformSampled').textContent='硬件信息不可用；不影响已有结果回放。';}
+}
+
+async function engineStatus(){
+  try{
+    const data=await api('/api/engine');state.engine=data.available;
+    $('engineStatus').innerHTML='<i></i>'+escape(data.message);$('engineStatus').classList.toggle('offline',!data.available);
+    $('runButton').disabled=!data.available||state.running||state.loadingCase;
+    if(!state.running){$('jobStatus').textContent=data.available?'就绪 · 启动后生成新的真实结果':data.message;$('jobPhase').textContent=data.available?'待运行':'引擎不可用';}
+    if(data.message.includes('正在检测'))setTimeout(engineStatus,2000);
+    else if(!data.available)reportError(Object.assign(new Error(data.message),{status:503}),'submit','重新检测',()=>{guidance.clear();engineStatus();},false);
+  }catch(error){
+    state.engine=false;$('runButton').disabled=true;$('engineStatus').innerHTML='<i></i>本地服务连接中断';$('engineStatus').classList.add('offline');
+    if(!state.running)$('jobStatus').textContent='请重新启动本地服务，然后点击“重新连接”。';
+    reportError(error,'load','重新连接',()=>{guidance.clear();engineStatus();},false);
+  }
+}
 async function monitorJob(id){
   state.running=true;$('runButton').disabled=true;$('runButton').querySelector('span').textContent='正在计算…';
-  sessionStorage.setItem('spparks-job',id);
+  lockInputs(true);
+  $('jobPhase').textContent='计算中';$('jobIndicator').className='running';$('jobIdentity').textContent='JOB / '+id;
+  $('resultStatus').textContent='新任务计算中 · 仍为上次结果';
+  setStoredJob(id);
   let connectionFailures=0;
   while(state.running){
     try{
       const job=await api(`/api/jobs/${id}`);connectionFailures=0;
+      $('jobElapsed').textContent=job.elapsed+' s';
+      $('solverTime').textContent=format(job.simulationTime)+' / '+format(job.parameters.duration);
+      $('solverProgress').value=Math.min(100,100*job.simulationTime/job.parameters.duration);
+      const consoleEl=$('consoleOutput'),atBottom=consoleEl.scrollHeight-consoleEl.scrollTop-consoleEl.clientHeight<35;
+      consoleEl.textContent=job.console||'引擎已启动，等待首批日志输出…（求解器可能缓冲输出）';
+      if(atBottom)consoleEl.scrollTop=consoleEl.scrollHeight;
       $('jobStatus').textContent=`已用时 ${job.elapsed}s · 已记录模型时间 ${format(job.simulationTime)} / ${job.parameters.duration}。当前画面仍是已载入结果。`;
-      if(job.status==='complete'){applyData(await api(`/api/jobs/${id}/result`));$('jobStatus').textContent=`计算完成 · ${job.elapsed}s · 已载入 ${state.data.frames.length} 帧真实结果`;toast('计算完成，已载入本次结果');break;}
+      if(job.status==='complete'){applyData(await api(`/api/jobs/${id}/result`));$('jobStatus').textContent=`计算完成 · ${job.elapsed}s · 已载入 ${state.data.frames.length} 帧真实结果`;$('jobPhase').textContent='已完成';$('jobIndicator').className='complete';$('solverProgress').value=100;guidance.show({tone:'success',title:'计算完成，可以观察本次结果了',message:'点击播放回看演化，或切换“初始 / 当前”对比组织变化。时间轴对应真实输出帧。',actionLabel:'查看本次结果',action:()=>{$('resultsPanel').scrollIntoView({block:'start'});guidance.clear();},scroll:false});toast('计算完成，已载入本次结果');break;}
       if(job.status==='failed')throw Object.assign(new Error(job.error),{terminal:true});
     }catch(error){
-      if(error.terminal||error.message==='任务不存在'){$('jobStatus').textContent=error.message;$('jobStatus').classList.add('error');toast('计算未完成，请查看运行信息');break;}
+      if(error.terminal||error.message==='任务不存在'){$('jobStatus').textContent='本次计算未完成，请查看日志和处理提示。';$('jobStatus').classList.add('error');$('jobPhase').textContent='未完成';$('jobIndicator').className='failed';$('resultStatus').textContent='任务未完成 · 保留原结果';if(error.status===404)guidance.show({title:'未找到这次任务',message:'服务重启后，尚未持久化的任务状态无法恢复。请确认旧计算已经结束，再启动新任务。当前显示的结果仍可回放。',detail:error.message});else reportError(error,'job','调整运行参数',()=>{$('runPanel').scrollIntoView({block:'start'});$('param-duration').focus();});break;}
       connectionFailures++;
       $('jobStatus').textContent='任务连接中断，正在重试；回放仍可使用。';
-      if(connectionFailures>=15){$('jobStatus').textContent='无法读取任务状态。恢复服务后刷新页面，将继续查询此任务。';state.running=false;return;}
+      if(connectionFailures>=3){$('jobStatus').textContent='连接中断，任务可能仍在计算。请恢复服务后重新查询。';$('jobPhase').textContent='连接中断';$('jobIndicator').className='failed';$('resultStatus').textContent='任务状态未知 · 保留原结果';guidance.show({title:'暂时无法读取计算进度',message:'任务可能仍在后台运行，为避免重复提交，输入保持锁定。恢复本地服务后，点击重新查询继续跟踪同一任务。',detail:error.message,actionLabel:'重新查询任务',action:()=>{guidance.clear();monitorJob(id);}});return;}
     }
     await new Promise(resolve=>setTimeout(resolve,1200));
   }
-  state.running=false;sessionStorage.removeItem('spparks-job');$('runButton').querySelector('span').textContent='运行仿真';$('runButton').disabled=!state.engine;
+  state.running=false;lockInputs(false);setStoredJob(null);$('runButton').querySelector('span').textContent='启动仿真';$('runButton').disabled=!state.engine;
 }
-$('parameterForm').onsubmit=async e=>{e.preventDefault();if(state.running)return;const parameters=Object.fromEntries(new FormData(e.target).entries());Object.keys(parameters).forEach(k=>parameters[k]=Number(parameters[k]));$('jobStatus').classList.remove('error');$('runButton').disabled=true;try{const job=await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modelId:state.model.id,parameters})});monitorJob(job.id);}catch(error){$('jobStatus').textContent=error.message;$('jobStatus').classList.add('error');$('runButton').disabled=!state.engine;}};
+$('parameterForm').noValidate=true;
+$('parameterForm').onsubmit=async e=>{
+  e.preventDefault();if(state.running||state.loadingCase||!state.model)return;
+  const parameters=Object.fromEntries(new FormData(e.target).entries()),problem=validateDraft(state.model,parameters);
+  guidance.clear();
+  if(problem){const input=$('param-'+problem.field);input.setAttribute('aria-invalid','true');input.setAttribute('aria-errormessage','recoveryText');guidance.show({title:'还有一个输入需要调整',message:problem.message,actionLabel:'定位此参数',action:()=>{input.scrollIntoView({block:'center'});input.focus();}});return;}
+  Object.keys(parameters).forEach(k=>parameters[k]=Number(parameters[k]));$('jobStatus').classList.remove('error');$('runButton').disabled=true;state.running=true;lockInputs(true);$('jobPhase').textContent='提交中';$('consoleOutput').textContent='正在提交参数并启动求解器…';
+  try{const job=await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modelId:state.model.id,parameters})});monitorJob(job.id);}
+  catch(error){state.running=false;lockInputs(false);$('jobStatus').textContent=error.status?'任务未启动，请按提示处理。':'尚不能确认提交结果，请勿连续启动。';$('jobStatus').classList.add('error');$('runButton').disabled=!state.engine;$('jobPhase').textContent=error.status?'提交失败':'提交状态未知';$('jobIndicator').className='failed';$('consoleOutput').textContent=error.message;reportError(error,'submit','重新检测连接',()=>{guidance.clear();engineStatus();});}
+};
 
 async function init(){
   document.querySelector('.color-legend').insertAdjacentHTML('beforebegin','<label id="vacancyRow" class="toggle-row compact" hidden><span>显示空位与顶部层</span><input id="showVacancies" type="checkbox" role="switch"/><span class="switch-track"></span></label>');
@@ -280,11 +372,13 @@ async function init(){
   try{
     const [models,data]=await Promise.all([api('/api/models'),api('/api/demo')]);
     state.models=models;
+    $('modelSelect').innerHTML=models.map(m=>`<option value="${escape(m.id)}">${escape(m.title)}</option>`).join('');
     document.querySelector('.nav-count').textContent=models.length;
     viewer=new LatticeViewer($('viewport'),updateSelection);
     applyData(data);
     engineStatus();
-    const activeJob=sessionStorage.getItem('spparks-job');if(activeJob)monitorJob(activeJob);
-  }catch(error){$('loading').classList.add('error');$('loading').textContent=`无法打开实验台：${error.message}。请确认已安装依赖并使用支持 WebGL 的浏览器。`;$('jobStatus').textContent='初始化失败，请刷新后重试。';}
+    loadPlatform();
+    const activeJob=getStoredJob();if(activeJob)monitorJob(activeJob);
+  }catch(error){$('loading').classList.add('error');$('loading').textContent='实验台未能完成加载，请查看上方处理提示。';$('jobStatus').textContent='初始化失败，请按提示重试。';guidance.show({title:'实验台尚未准备好',message:'请确认本地服务已启动、依赖已安装，浏览器支持 WebGL。修复后重新加载；刷新不会提交计算。',detail:error.message,actionLabel:'重新加载实验台',action:()=>location.reload()});}
 }
 init();

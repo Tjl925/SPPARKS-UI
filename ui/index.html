@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#f4f6f3" />
   <title>SPPARKS · 材料仿真实验台</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/workbench.css" />
   <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
 </head>
 <body>
@@ -45,24 +45,60 @@
     </aside>
     <main>
       <div class="breadcrumb">案例库 <span>/</span> 晶粒长大 <span>/</span> <b>三维实验台</b></div>
-      <section class="page-heading"><div><div class="eyebrow">MICROSTRUCTURE EVOLUTION <span>CASE 001</span></div><h1>看见微观组织的演化<span class="title-dot">.</span></h1><p>Potts 晶粒长大 <span>·</span> 从随机初态到有序组织，探索三维空间中的变化。</p></div><div class="heading-actions"><button class="button" id="importButton"><svg><use href="#i-upload"/></svg>导入结果</button><button class="button dark-button" id="presentButton"><svg><use href="#i-expand"/></svg>展示模式</button></div></section>
+      <section class="page-heading"><div><div class="eyebrow">SIMULATION WORKBENCH / CASE 001</div><h1>材料仿真工作台</h1><p>定义物理问题，确认运行平台，启动仿真并分析结果。</p></div><div class="heading-actions"><button class="button" id="importButton"><svg><use href="#i-upload"/></svg>导入结果</button><button class="button dark-button" id="presentButton"><svg><use href="#i-expand"/></svg>展示模式</button></div></section>
+      <nav class="workflow" aria-label="仿真操作顺序"><a href="#physicsPanel"><b>01</b> 定义物理 <span>模型与条件</span></a><i>→</i><a href="#platformPanel"><b>02</b> 确认平台 <span>硬件与资源</span></a><i>→</i><a href="#runPanel"><b>03</b> 启动仿真 <span>任务与日志</span></a><i>→</i><a href="#resultsPanel"><b>04</b> 观察结果 <span>结构与指标</span></a></nav>
+      <div class="configuration-grid">
+        <section class="work-panel physics-panel" id="physicsPanel" aria-labelledby="physicsTitle">
+          <div class="panel-heading"><span class="panel-index">01</span><h2 id="physicsTitle">物理定义</h2><span class="panel-kicker">PHYSICS</span><button class="tiny-button" id="resetParams" type="button">恢复结果参数</button></div>
+          <form id="parameterForm">
+            <div class="model-row"><label for="modelSelect">材料模型 <small>从已验证案例开始</small></label><select id="modelSelect" aria-describedby="modelDescription"></select><span class="model-dimension" id="modelDimension">3D</span></div>
+            <p id="modelDescription" class="model-description"></p>
+            <div class="physics-columns">
+              <section class="parameter-group"><h3><span>Ⅰ</span> 激励与演化</h3><p class="group-caption" id="excitationDescription"></p><div id="excitationFields"></div></section>
+              <section class="parameter-group"><h3><span>Ⅱ</span> 格点与状态参数</h3><p class="group-caption" id="entityDescription"></p><div id="parameterFields"></div></section>
+            </div>
+            <details class="model-details"><summary>模型假设与固定配置 <span>晶格 / 边界 / 初态</span></summary><div class="fixed-params"></div><p id="fixedDescription"></p><p id="initialDescription"></p></details>
+          </form>
+          <div class="input-notice" id="inputNotice" role="status">已载入案例参数，可直接运行。</div>
+        </section>
+        <section class="work-panel platform-panel" id="platformPanel" aria-labelledby="platformTitle">
+          <div class="panel-heading"><span class="panel-index">02</span><h2 id="platformTitle">计算平台</h2><span class="panel-kicker">COMPUTE</span></div>
+          <div class="platform-host"><span class="live-dot"></span><strong id="hostSystem">本地工作站</strong><span id="platformState">检测中</span></div>
+          <p class="cpu-name" id="cpuName">正在读取 CPU 信息…</p>
+          <div class="hardware-grid"><div><span>CPU 物理核心</span><strong id="physicalCores">—</strong><small>宿主机总量</small></div><div><span>逻辑处理器</span><strong id="logicalProcessors">—</strong><small>硬件线程总量</small></div><div><span>物理内存</span><strong id="memoryTotal">—</strong><small id="memoryAvailable">可用量尚未获取</small></div></div>
+          <div class="execution-box"><div class="execution-title"><h3>本次运行资源</h3><span>SERIAL</span></div><dl><div><dt>执行环境</dt><dd id="runtimeName">正在检测</dd></div><div><dt>计算进程 / 线程</dt><dd>1 进程 / 1 线程</dd></div><div><dt>内存分配</dt><dd>系统动态分配</dd></div><div><dt>运行上限</dt><dd>180 秒 / 任务</dd></div></dl></div>
+          <p class="platform-note">当前串行求解器固定单进程、单计算线程。上方为宿主机资源，不代表任务占用或 WSL 配额。</p><span class="platform-sampled" id="platformSampled">硬件检测不影响结果回放</span>
+        </section>
+      </div>
       <div class="experiment-layout">
-        <div class="visual-column">
+        <section class="work-panel run-panel" id="runPanel" aria-labelledby="runTitle">
+          <div class="panel-heading"><span class="panel-index">03</span><h2 id="runTitle">运行控制台</h2><span class="panel-kicker">SOLVER</span></div>
+          <div class="run-body"><div id="runFields"></div><div class="run-summary" id="runSummary">等待模型加载</div><button class="button primary-button" type="submit" form="parameterForm" id="runButton" disabled><svg><use href="#i-play"/></svg><span>启动仿真</span><svg class="run-arrow"><use href="#i-arrow"/></svg></button><div class="job-status" id="jobStatus" role="status">正在检测本地引擎…</div></div>
+          <div class="console-heading"><span><i id="jobIndicator"></i><b id="jobPhase">就绪检查</b></span><span id="jobElapsed">—</span></div>
+          <div class="solver-progress"><span>已输出模型时间</span><strong id="solverTime">—</strong><progress id="solverProgress" value="0" max="100" aria-label="已记录模型时间进度"></progress></div>
+          <pre id="consoleOutput" class="console-output" tabindex="0" aria-label="求解器日志">尚未提交任务。
+选择模型 → 确认参数 → 启动仿真。
+此处显示 SPPARKS 实际运行日志。</pre>
+          <div class="console-footer"><span id="jobIdentity">NO ACTIVE JOB</span><span>日志末尾 · 12 KB</span></div>
+        </section>
+        <div class="visual-column" id="resultsPanel">
+          <div class="results-heading"><span class="panel-index">04</span><h2>仿真可视化</h2><span class="result-status" id="resultStatus">已载入结果 / 回放</span></div>
+
           <section class="viewer-card">
             <div class="viewer-toolbar"><div class="view-tabs"><button class="selected" id="singleTab"><svg><use href="#i-cube"/></svg>三维组织</button><button id="compareTab"><svg><use href="#i-compare"/></svg>初始 / 当前</button></div><div class="viewer-tools"><button class="icon-button" id="resetView" title="复位视角" aria-label="复位视角"><svg><use href="#i-reset"/></svg></button><button class="icon-button" id="snapshotButton" title="导出当前视图 PNG" aria-label="导出当前视图 PNG"><svg><use href="#i-download"/></svg></button></div></div>
             <div class="stage" id="stage"><div id="viewport" class="viewport" aria-label="三维格点视图，可拖拽旋转、滚轮缩放、右键平移" tabindex="0"></div><div id="compareViewport" class="viewport compare-viewport" aria-label="当前帧对比视图" tabindex="0"></div><div class="stage-heading"><span class="live-dot"></span><span id="stageSource">历史结果 · 真实数据</span><span class="stage-divider">/</span><span id="stageSize">20 × 20 × 20</span></div><div class="stage-label" id="compareLabel">初始态</div><div class="stage-label compare-label" id="compareLabelRight">当前态</div><div class="stage-time">t = <strong id="stageTime">100.00</strong><small>模型时间</small></div><div class="stage-bottom"><span><span class="mouse-icon"></span>拖拽旋转 <i>·</i> 滚轮缩放 <i>·</i> 右键平移</span><span id="visibleCount">8,000 格点</span></div><div class="loading" id="loading">正在载入真实仿真结果…</div><div class="selection" id="selection" hidden></div></div>
-            <div class="timeline"><div class="playback-row"><button id="playButton" class="play-button" aria-label="播放演化"><svg><use href="#i-play"/></svg></button><button id="prevFrame" class="step-button" title="上一帧" aria-label="上一帧">‹</button><button id="nextFrame" class="step-button" title="下一帧" aria-label="下一帧">›</button><div class="time-readout"><b id="currentTime">100.00</b><span>/ <span id="endTime">100.00</span></span></div><span class="frame-tag" id="frameCounter">11 / 11 帧</span><select id="playSpeed" aria-label="回放速度"><option value="1500">0.5×</option><option value="750" selected>1×</option><option value="375">2×</option></select></div><input type="range" min="0" max="10" value="10" id="timeline" aria-label="仿真时间轴"/><div class="timeline-labels"><span>初始组织 <b>0</b></span><span id="middleTime">50</span><span><b id="endLabel">100</b> 演化末态</span></div></div>
+            <div class="timeline"><div class="playback-row"><span class="playback-label">结果回放</span><button id="playButton" class="play-button" aria-label="播放演化"><svg><use href="#i-play"/></svg></button><button id="prevFrame" class="step-button" title="上一帧" aria-label="上一帧">‹</button><button id="nextFrame" class="step-button" title="下一帧" aria-label="下一帧">›</button><div class="time-readout"><b id="currentTime">100.00</b><span>/ <span id="endTime">100.00</span></span></div><span class="frame-tag" id="frameCounter">11 / 11 帧</span><select id="playSpeed" aria-label="回放速度"><option value="1500">0.5×</option><option value="750" selected>1×</option><option value="375">2×</option></select></div><input type="range" min="0" max="10" value="10" id="timeline" aria-label="仿真时间轴"/><div class="timeline-labels"><span>初始组织 <b>0</b></span><span id="middleTime">50</span><span><b id="endLabel">100</b> 演化末态</span></div></div>
           </section>
+        <details class="inspector"><summary>观察工具 <span>剖切 · 配色 · 自动旋转</span></summary>
+          <section class="control-section"><div class="section-title"><span class="section-index">01</span><h2>观察设置</h2><span class="small-tag">VIEW</span></div><label class="toggle-row" for="clipEnabled"><span>剖切观察<small>移除外层，查看内部组织</small></span><input type="checkbox" id="clipEnabled" role="switch"/><span class="switch-track"></span></label><div id="clipControls" class="clip-controls disabled"><div class="label-row"><span>剖切方向</span><span id="clipLayerLabel">Z = 9</span></div><div class="segmented" aria-label="剖切方向"><button data-axis="0">X</button><button data-axis="1">Y</button><button data-axis="2" class="selected">Z</button></div><input type="range" id="clipPosition" min="0" max="19" value="9" aria-label="保留至剖切层"/><div class="range-labels"><span id="clipMin">0</span><span id="clipMax">19</span></div></div><label class="toggle-row compact" for="autoRotate"><span>自动旋转</span><input type="checkbox" id="autoRotate" role="switch"/><span class="switch-track"></span></label><div class="color-legend"><div class="label-row"><span>状态分类配色</span><span id="stateCount">Q = 100</span></div><div class="palette" id="palette"></div><p>同色表示同一状态编号</p></div></section>
+          <div class="observation-note"><span class="note-mark">↳</span><div><strong id="observationTitle">观察提示</strong><p id="observationText">开启剖切，拖动时间轴，观察内部同状态区域的变化。</p></div></div>
+        </details>
           <section class="analysis-card"><div class="analysis-heading"><div><svg><use href="#i-chart"/></svg><h2>能量演化</h2><span>与时间轴联动</span></div><span class="legend-dot"></span><span class="chart-key">格点总能量</span></div><div class="analysis-body"><div class="chart-wrap"><svg id="energyChart" viewBox="0 0 600 138" role="img" aria-label="总能量随模型时间变化曲线"></svg><span class="chart-axis-label">模型时间 →</span></div><div class="energy-summary"><span>当前总能量 <small>模型单位</small></span><strong id="energyValue">—</strong><span class="energy-change" id="energyChange">—</span></div></div></section>
           <p class="data-footnote"><svg><use href="#i-info"/></svg><span id="dataFootnote">数据来源：SPPARKS 随包历史示例。状态颜色表示类别，不等同于独立晶粒或真实晶体取向。</span><button id="sourceButton">来源与模型说明</button></p>
         </div>
-        <aside class="inspector">
-          <section class="control-section"><div class="section-title"><span class="section-index">01</span><h2>观察设置</h2><span class="small-tag">VIEW</span></div><label class="toggle-row" for="clipEnabled"><span>剖切观察<small>移除外层，查看内部组织</small></span><input type="checkbox" id="clipEnabled" role="switch"/><span class="switch-track"></span></label><div id="clipControls" class="clip-controls disabled"><div class="label-row"><span>剖切方向</span><span id="clipLayerLabel">Z = 9</span></div><div class="segmented" aria-label="剖切方向"><button data-axis="0">X</button><button data-axis="1">Y</button><button data-axis="2" class="selected">Z</button></div><input type="range" id="clipPosition" min="0" max="19" value="9" aria-label="保留至剖切层"/><div class="range-labels"><span id="clipMin">0</span><span id="clipMax">19</span></div></div><label class="toggle-row compact" for="autoRotate"><span>自动旋转</span><input type="checkbox" id="autoRotate" role="switch"/><span class="switch-track"></span></label><div class="color-legend"><div class="label-row"><span>状态分类配色</span><span id="stateCount">Q = 100</span></div><div class="palette" id="palette"></div><p>同色表示同一状态编号</p></div></section>
-          <section class="control-section parameter-section"><div class="section-title"><span class="section-index">02</span><h2>仿真参数</h2><button class="tiny-button" id="resetParams" title="恢复当前结果的参数">重置</button></div><p class="section-hint">修改后运行，生成一组新的真实结果。</p><form id="parameterForm"><div id="parameterFields"></div><div class="fixed-params"><span>晶格 <b>SC / 26 邻居</b></span><span>边界 <b>三向周期性</b></span></div><button class="button primary-button" type="submit" id="runButton" disabled><svg><use href="#i-play"/></svg><span>运行仿真</span><svg class="run-arrow"><use href="#i-arrow"/></svg></button></form><div class="job-status" id="jobStatus" role="status">正在检测本地引擎…</div></section>
-          <div class="observation-note"><span class="note-mark">↳</span><div><strong id="observationTitle">观察提示</strong><p id="observationText">开启剖切，拖动时间轴，观察内部同状态区域的变化。</p></div></div>
-        </aside>
+
       </div>
-      <footer class="main-footer"><span><span class="tiny-dot"></span>从微观结构，理解材料行为</span><span>SPPARKS / MATERIAL LAB <b>01</b></span></footer>
+      <footer class="main-footer"><span><span class="tiny-dot"></span>定义物理 → 确认平台 → 运行 → 分析</span><span>SPPARKS / MATERIAL LAB <b>01</b></span></footer>
     </main>
   </div>
   <dialog id="infoDialog"><div class="dialog-heading"><div><span class="eyebrow" id="dialogEyebrow">MATERIAL LAB</span><h2 id="dialogTitle"></h2></div><button class="icon-button" id="closeDialog" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div><div id="dialogBody"></div></dialog>
